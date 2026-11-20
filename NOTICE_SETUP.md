@@ -12,16 +12,16 @@ GitHub에서 fine-grained personal access token을 만들고 저장소 `commulgo
 
 ## 3. Worker 배포 및 비밀값 등록
 
-컴퓨터에 Node.js가 설치된 상태에서 저장소 폴더의 PowerShell을 열고 다음 명령을 실행합니다.
+먼저 Turnstile에서 받은 공개 Site Key를 `worker/wrangler.toml`의 `TURNSTILE_SITE_KEY`에 입력합니다. 그런 다음 컴퓨터에 Node.js가 설치된 상태에서 저장소 폴더의 PowerShell을 열고 아래 순서대로 실행합니다.
 
 ```powershell
 npx wrangler login
+npx wrangler deploy --config worker/wrangler.toml
 npx wrangler secret put GITHUB_TOKEN --config worker/wrangler.toml
 npx wrangler secret put TURNSTILE_SECRET_KEY --config worker/wrangler.toml
-npx wrangler deploy --config worker/wrangler.toml
 ```
 
-각 `secret put` 명령이 입력을 요청하면 해당 비밀값을 터미널에 직접 붙여 넣습니다. 성공하면 Worker 주소가 표시됩니다. 보통 `https://spain-paris-guestbook.<계정>.workers.dev` 형식입니다.
+첫 배포에서 Worker 주소가 표시됩니다. 보통 `https://spain-paris-guestbook.<계정>.workers.dev` 형식입니다. 이어지는 `secret put` 명령이 입력을 요청하면 해당 비밀값을 터미널에 직접 붙여 넣습니다. 각 명령은 비밀값을 Worker에 저장하고 새 버전을 배포합니다.
 
 ## 4. 사이트에 Worker 주소 연결
 
