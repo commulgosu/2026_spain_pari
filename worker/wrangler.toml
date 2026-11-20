@@ -1,0 +1,12 @@
+name = "spain-paris-notices"
+main = "src/index.js"
+compatibility_date = "2026-11-20"
+workers_dev = true
+
+[vars]
+GITHUB_OWNER = "commulgosu"
+GITHUB_REPO = "2026_spain_pari"
+GITHUB_BRANCH = "main"
+GITHUB_FILE = "notices.json"
+ALLOWED_ORIGIN = "https://commulgosu.github.io"
+TURNSTILE_SITE_KEY = "REPLACE_WITH_TURNSTILE_SITE_KEY"
