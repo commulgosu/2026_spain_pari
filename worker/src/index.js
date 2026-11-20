@@ -45,13 +45,13 @@ async function githubRequest(env, method, body) {
   });
 }
 
-async function readNotices(env) {
+async function readEntries(env) {
   const response = await githubRequest(env, 'GET');
-  if (response.status === 404) return { notices: [], sha: null };
+  if (response.status === 404) return { entries: [], sha: null };
   if (!response.ok) throw new Error('GitHub read failed');
   const file = await response.json();
   const parsed = JSON.parse(decodeBase64Utf8(file.content));
-  return { notices: Array.isArray(parsed.notices) ? parsed.notices : [], sha: file.sha };
+  return { entries: Array.isArray(parsed.entries) ? parsed.entries : [], sha: file.sha };
 }
 
 async function verifyTurnstile(token, request, env) {
@@ -84,15 +84,15 @@ export default {
     if (url.pathname === '/api/config' && request.method === 'GET') {
       return json({ siteKey: env.TURNSTILE_SITE_KEY }, 200, env.ALLOWED_ORIGIN);
     }
-    if (url.pathname === '/api/notices' && request.method === 'GET') {
+    if (url.pathname === '/api/guestbook' && request.method === 'GET') {
       try {
-        const { notices } = await readNotices(env);
-        return json({ notices: notices.slice(0, 100) }, 200, env.ALLOWED_ORIGIN);
+        const { entries } = await readEntries(env);
+        return json({ entries: entries.slice(0, 100) }, 200, env.ALLOWED_ORIGIN);
       } catch {
-        return json({ error: '공지를 불러오지 못했습니다.' }, 502, env.ALLOWED_ORIGIN);
+        return json({ error: '방명록을 불러오지 못했습니다.' }, 502, env.ALLOWED_ORIGIN);
       }
     }
-    if (url.pathname !== '/api/notices' || request.method !== 'POST') {
+    if (url.pathname !== '/api/guestbook' || request.method !== 'POST') {
       return json({ error: '찾을 수 없는 요청입니다.' }, 404, env.ALLOWED_ORIGIN);
     }
     let input;
@@ -102,33 +102,32 @@ export default {
     if (typeof input.website === 'string' && input.website.trim()) {
       return json({ ok: true }, 200, env.ALLOWED_ORIGIN);
     }
-    const title = typeof input.title === 'string' ? input.title.trim() : '';
     const author = typeof input.author === 'string' ? input.author.trim() : '';
     const body = typeof input.body === 'string' ? input.body.trim() : '';
     const token = typeof input.turnstileToken === 'string' ? input.turnstileToken : '';
-    if (title.length < 2 || title.length > 80 || author.length > 30 || body.length < 2 || body.length > 1500) {
-      return json({ error: '제목, 작성자, 내용의 길이를 확인해 주세요.' }, 400, env.ALLOWED_ORIGIN);
+    if (author.length > 30 || body.length < 2 || body.length > 1500) {
+      return json({ error: '닉네임과 메시지 길이를 확인해 주세요.' }, 400, env.ALLOWED_ORIGIN);
     }
     if (!token || !await verifyTurnstile(token, request, env)) {
       return json({ error: '봇 확인이 만료되었습니다. 다시 확인해 주세요.' }, 400, env.ALLOWED_ORIGIN);
     }
-    const notice = { id: crypto.randomUUID(), createdAt: new Date().toISOString(), title, author, body };
+    const entry = { id: crypto.randomUUID(), createdAt: new Date().toISOString(), author: author || '익명', body };
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const current = await readNotices(env);
-        const nextNotices = [notice, ...current.notices].slice(0, 2000);
+        const current = await readEntries(env);
+        const nextEntries = [entry, ...current.entries].slice(0, 2000);
         const update = await githubRequest(env, 'PUT', {
-          message: `Add visitor notice: ${title.slice(0, 50)}`,
+          message: 'Add visitor guestbook entry',
           branch: env.GITHUB_BRANCH,
-          content: encodeBase64Utf8(`${JSON.stringify({ notices: nextNotices }, null, 2)}\n`),
+          content: encodeBase64Utf8(`${JSON.stringify({ entries: nextEntries }, null, 2)}\n`),
           ...(current.sha ? { sha: current.sha } : {})
         });
-        if (update.ok) return json({ ok: true, notice }, 201, env.ALLOWED_ORIGIN);
+        if (update.ok) return json({ ok: true, entry }, 201, env.ALLOWED_ORIGIN);
         if (update.status !== 409 && update.status !== 422) throw new Error('GitHub write failed');
       } catch {
-        if (attempt === 2) return json({ error: '공지 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.' }, 502, env.ALLOWED_ORIGIN);
+        if (attempt === 2) return json({ error: '방명록 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.' }, 502, env.ALLOWED_ORIGIN);
       }
     }
-    return json({ error: '동시에 등록된 공지가 있어 저장하지 못했습니다. 다시 시도해 주세요.' }, 409, env.ALLOWED_ORIGIN);
+    return json({ error: '동시에 등록된 글이 있어 저장하지 못했습니다. 다시 시도해 주세요.' }, 409, env.ALLOWED_ORIGIN);
   }
 };
